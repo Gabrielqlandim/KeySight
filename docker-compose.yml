@@ -1,0 +1,74 @@
+# Docker Compose orquestra múltiplos containers como um grupo só.
+# Rodamos `docker compose up` uma vez e ele sobe banco, backend e
+# frontend juntos, já conectados entre si na mesma rede virtual.
+services:
+
+  # --- Banco de dados Postgres ---
+  db:
+    # Usamos a imagem oficial do Postgres, versão 16, variante "alpine"
+    # (Linux minimalista, imagem bem menor).
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      # Essas três variáveis são lidas pela própria imagem oficial do
+      # Postgres para criar o usuário, senha e banco na primeira vez
+      # que o container sobe.
+      POSTGRES_USER: keysight
+      POSTGRES_PASSWORD: keysight
+      POSTGRES_DB: keysight
+    volumes:
+      # Um "named volume": o Docker gerencia esse armazenamento por
+      # fora do container. Sem isso, toda vez que o container do banco
+      # fosse recriado, os dados seriam perdidos.
+      - keysight_pgdata:/var/lib/postgresql/data
+    ports:
+      # "host:container" — expõe a porta 5432 também na sua máquina,
+      # útil para conectar com uma ferramenta como DBeaver/TablePlus
+      # de fora do Docker enquanto aprende.
+      - "5432:5432"
+
+  # --- Backend FastAPI ---
+  backend:
+    build:
+      # Constrói a imagem a partir do Dockerfile dentro de ./backend,
+      # em vez de baixar uma imagem pronta.
+      context: ./backend
+    restart: unless-stopped
+    environment:
+      # URL de conexão que o SQLAlchemy vai usar. Note que o host não é
+      # "localhost", e sim "db" — dentro da rede do Docker Compose, cada
+      # serviço é acessível pelos outros usando o nome do serviço como
+      # se fosse um hostname de DNS.
+      DATABASE_URL: postgresql://keysight:keysight@db:5432/keysight
+    volumes:
+      # Monta o código local dentro do container. Combinado com
+      # --reload no uvicorn, isso faz o servidor recarregar sozinho
+      # sempre que você salvar um arquivo .py — sem precisar rebuildar
+      # a imagem a cada mudança.
+      - ./backend:/app
+    ports:
+      - "8000:8000"
+    depends_on:
+      # Só sobe o backend depois do container do banco já ter iniciado.
+      # (Não garante que o Postgres já aceita conexões, só que o
+      # processo começou — isso é o suficiente por agora.)
+      - db
+
+  # --- Frontend Vue ---
+  frontend:
+    build:
+      context: ./frontend
+    restart: unless-stopped
+    volumes:
+      - ./frontend:/app
+      # Volume "anônimo" extra: evita que o node_modules instalado
+      # dentro da imagem seja sobrescrito pelo volume acima (que espelha
+      # sua pasta local, onde node_modules pode nem existir ainda).
+      - /app/node_modules
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+
+volumes:
+  keysight_pgdata:

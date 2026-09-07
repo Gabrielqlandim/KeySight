@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Variáveis de ambiente (nunca commitar chaves/senhas)
+.env
+*.env.local
+
+# Node / frontend
+node_modules/
+dist/
+dist-ssr/
+*.local
+
+# Editores
+.vscode/*
+!.vscode/extensions.json
+.idea/
+
+# Sistema
+.DS_Store
+Thumbs.db
