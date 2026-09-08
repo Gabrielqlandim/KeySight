@@ -5,7 +5,7 @@ Por enquanto não fala com o banco de dados nem com nenhuma API externa —
 isso vem nos próximos módulos. O objetivo aqui é só validar que o
 backend sobe e responde.
 """
-
+from app import itad_client
 from fastapi import FastAPI, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
@@ -71,3 +71,45 @@ def delete_game(game_id: int, db: Session= Depends(get_db)):
         raise HTTPException(status_code=404, detail="Jogo não encontrado")
     db.delete(db_game)
     db.commit()
+
+@app.post("/games/{game_id}/refresh-price")
+async def refresh_price(game_id: int, db: Session = Depends(get_db)):
+    db_game = db.query(models.Game).filter(models.Game.id == game_id).first()
+    if db_game is None:
+        raise HTTPException(status_code=404, detail= "Jogo não encontrado")
+    try:
+        itad_id = await itad_client.lookup_game_id(db_game.name)
+        if itad_id is None:
+            raise HTTPException(status_code=404, detail="Jogo nao encontado na base da api do itad")
+        deals = await itad_client.get_current_prices(itad_id)
+    except itad_client.ITADClientError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+
+    updated_offers = []
+    for deal in deals:
+        shop_name = deal["shop"]["name"]
+        price = deal["price"]["amount"]
+        url = deal["url"]
+        offer = (
+            db.query(models.StoreOffer).filter(
+                models.StoreOffer.game_id == game_id,
+                models.StoreOffer.store_name == shop_name,
+            ).first()
+        )
+        if offer is None:
+            offer = models.StoreOffer(
+                game_id=game_id,
+                store_name = shop_name,
+                current_price = price,
+                url = url,
+            )
+            db.add(offer)
+            db.flush()
+        else:
+            offer.current_price = price
+            offer.url = url
+
+        db.add(models.PriceHistory(offer_id = offer.id, price=price))
+        updated_offers.append(shop_name)
+    db.commit()
+    return { "game": db_game.name, "stores_updated": updated_offers}
