@@ -7,6 +7,7 @@ backend sobe e responde.
 """
 from app import itad_client
 from fastapi import FastAPI, Depends, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from app.database import engine, get_db, Base
@@ -23,6 +24,13 @@ app = FastAPI(
     version="0.1.0",
 )
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # `@app.get("/")` é um "decorator": ele registra a função logo abaixo
 # como a responsável por atender requisições HTTP GET na rota "/".
