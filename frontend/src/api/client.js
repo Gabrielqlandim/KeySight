@@ -29,5 +29,5 @@ export function deleteGame(gameId){
 }
 
 export function refreshPrice(gameId){
-    return request(`/game/${gameId}/refresh-price`, {method: 'POST'})
+    return request(`/games/${gameId}/refresh-price`, {method: 'POST'})
 }
