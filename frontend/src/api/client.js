@@ -31,3 +31,11 @@ export function deleteGame(gameId){
 export function refreshPrice(gameId){
     return request(`/games/${gameId}/refresh-price`, {method: 'POST'})
 }
+
+export function listOffers(gameId){
+    return request(`/games/${gameId}/offers`)
+}
+
+export function getPriceHistory(gameId){
+    return request(`/games/${gameId}/price-history`)
+}

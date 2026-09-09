@@ -121,3 +121,28 @@ async def refresh_price(game_id: int, db: Session = Depends(get_db)):
         updated_offers.append(shop_name)
     db.commit()
     return { "game": db_game.name, "stores_updated": updated_offers}
+
+@app.get("/games/{game_id}/offers", response_model=list[schemas.StoreOfferRead])
+def list_offers(game_id: int, db: Session = Depends(get_db)):
+    db_game = db.query(models.Game).filter(models.Game.id == game_id).first()
+
+    if db_game is None:
+        raise HTTPException(status_code=404, detail="Jogo não encontrado")
+
+    return db.query(models.StoreOffer).filter(models.StoreOffer.game_id == game_id).all()
+
+@app.get("/games/{game_id}/price-history", response_model=list[schemas.PricePoint])
+def price_history(game_id: int, db: Session = Depends(get_db)):
+    db_game = db.query(models.Game).filter(models.Game.id == game_id).first()
+
+    if db_game is None:
+        raise HTTPException(status_code=404, detail="Jogo não encontrado")
+
+    history = (
+        db.query(models.PriceHistory)
+        .join(models.StoreOffer, models.PriceHistory.offer_id == models.StoreOffer.id)
+        .filter(models.StoreOffer.game_id == game_id)
+        .order_by(models.PriceHistory.recorded_at)
+        .all()
+    )
+    return history
